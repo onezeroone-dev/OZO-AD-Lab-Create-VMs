@@ -1,7 +1,7 @@
 # OZO AD Lab Create VMs
 
 ## Description
-This script automates part 5/8 in a [series that illustrates how to customize the Windows installer media to automate the process of installing a Windows AD domain controller, a Windows file server, and a Windows desktop environment](https://onezeroone.dev/active-directory-lab-introduction).
+This script automates [part five of eight in a One Zero One series](https://onezeroone.dev/active-directory-lab-introduction) that illustrates how to customize the Windows installer media to automate the process of installing a Windows AD domain controller, a Windows file server, and a Windows desktop environment.
 
 It is an interactive script that creates a the Hyper-V virtual machines required for the One Zero One AD Lab as described in [Active Directory Lab: Create the Virtual Machines](https://onezeroone.dev/active-directory-lab-create-the-virtual-machines). If a virtual machine already exists, it is skipped (this is useful if e.g., you would like to keep the Linux router VM but delete and replace all the Windows VMs.)
 
