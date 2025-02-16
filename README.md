@@ -1,7 +1,9 @@
 # OZO AD Lab Create VMs
 
 ## Description
-An interactive script that creates a the Hyper-V virtual machines required for the One Zero One AD Lab as described in [Active Directory Lab: Create the Virtual Machines](https://onezeroone.dev/active-directory-lab-create-the-virtual-machines). If a virtual machine already exists, it is skipped.
+This script automates part 5/8 in a [series that illustrates how to customize the Windows installer media to automate the process of installing a Windows AD domain controller, a Windows file server, and a Windows desktop environment](https://onezeroone.dev/active-directory-lab-introduction).
+
+It is an interactive script that creates a the Hyper-V virtual machines required for the One Zero One AD Lab as described in [Active Directory Lab: Create the Virtual Machines](https://onezeroone.dev/active-directory-lab-create-the-virtual-machines). If a virtual machine already exists, it is skipped (this is useful if e.g., you would like to keep the Linux router VM but delete and replace all the Windows VMs.)
 
 ## Prerequisites
 To use this script you must first install Hyper-V and restart, and create two Hyper-V virtual switches. Please see [Active Directory Lab: Prerequisites](https://onezeroone.dev/active-directory-lab-prerequisites).
@@ -14,8 +16,6 @@ Install-Script ozo-ad-lab-create-vms
 ```
 
 ## Usage
-Execute this script in an _Administrator_ PowerShell to implement the "One Zero One" Windows event log provider:
-
 ```powershell
 ozo-ad-lab-create-vms
     -ClientISO <String>
@@ -28,12 +28,12 @@ ozo-ad-lab-create-vms
 ## Parameters
 |Parameter|Description|
 |---------|-----------|
-|`ClientISO`|Path to the [customized\] Client ISO. Defaults to `C:\ozo-ad-lab\ISO\AD-Lab-Client.iso`.|
-|`DCISO`|Path to the [customized\] DC ISO. Defaults to `C:\ozo-ad-lab\ISO\AD-Lab-DC.iso`.|
-|`LaofISO`|Path to the Windows 11 Lanuages & Optional Features ISO. Defaults to `C:\ozo-ad-lab\ISO\Windows-11-Lanuages-and-Optional-Features.iso`.|
-|`RouterISO`|Path to the [customized\] Router ISO. Defaults to `C:\ozo-ad-lab\ISO\AD-Lab-Router.iso`.|
-|`ServerISO`|Path to the [customized\] Server ISO. Defaults to `C:\ozo-ad-lab\ISO\AD-Lab-Server.iso`.|
-|`VHDXPath`|Path for the VHDX files. Defaults to `$Env:ProgramData\Microsoft\Windows\Virtual Hard Disks`.|
+|`ClientISO`|The path to the [customized\] Client ISO. Defaults to `C:\ozo-ad-lab\ISO\AD-Lab-Client.iso`.|
+|`DCISO`|The path to the [customized\] DC ISO. Defaults to `C:\ozo-ad-lab\ISO\AD-Lab-DC.iso`.|
+|`LaofISO`|The path to the Windows 11 Lanuages & Optional Features ISO. Defaults to `C:\ozo-ad-lab\ISO\Windows-11-Lanuages-and-Optional-Features.iso`.|
+|`RouterISO`|The path to the [customized\] Router ISO. Defaults to `C:\ozo-ad-lab\ISO\AD-Lab-Router.iso`.|
+|`ServerISO`|The path to the [customized\] Server ISO. Defaults to `C:\ozo-ad-lab\ISO\AD-Lab-Server.iso`.|
+|`VHDXPath`|The path for the VHDX files. Defaults to `$Env:ProgramData\Microsoft\Windows\Virtual Hard Disks`.|
 
 ## Examples
 ### Example 1
@@ -49,7 +49,7 @@ ozo-ad-lab-create-vms -ClientISO "$isoPath\AD-Lab-Client.iso" -DCISO "$isoPath\A
 ```
 
 ## Notes
-This script automates part 5/8 in a [series that illustrates how to customize the Windows installer media to automate the process of installing a Windows AD domain controller, a Windows file server, and a Windows desktop environment](https://onezeroone.dev/active-directory-lab-introduction).
+Run this script in an _Administrator_ PowerShell.
 
 ## Acknowledgements
 Special thanks to my employer, [Sonic Healthcare USA](https://sonichealthcareusa.com), who has supported the growth of my PowerShell skillset and enabled me to contribute portions of my work product to the PowerShell community.
