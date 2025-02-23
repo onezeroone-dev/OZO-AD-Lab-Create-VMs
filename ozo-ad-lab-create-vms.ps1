@@ -1,7 +1,7 @@
 #Requires -Modules @{ModuleName="OZO";ModuleVersion="1.5.0"},@{ModuleName="OZOLogger";ModuleVersion="1.1.0"} -RunAsAdministrator
 
 <#PSScriptInfo
-    .VERSION 1.0.0
+    .VERSION 1.0.1
     .GUID e2071482-27a4-415c-b3db-43d5351d24bb
     .AUTHOR Andy Lievertz <alievertz@onezeroone.dev>
     .COMPANYNAME One Zero One
@@ -21,19 +21,19 @@
     .DESCRIPTION 
     An interactive script that creates a the Hyper-V virtual machines required for the One Zero One AD Lab.
     .PARAMETER ClientISO
-    The path to the customized Client ISO. Defaults to C:\ozo-ad-lab\ISO\AD-Lab-Client.iso.
+    The path to the customized Client ISO. Defaults to $Env:UserProfile\Downloads\AD-Lab-Client.iso.
     .PARAMETER DCISO
-    The path to the customized DC ISO. Defaults to C:\ozo-ad-lab\ISO\AD-Lab-DC.iso.
-    .PARAMETER LaofISO
-    The path to the Windows 11 Lanuages & Optional Features ISO. Defaults to C:\ozo-ad-lab\ISO\Windows-11-Lanuages-and-Optional-Features.iso.
+    The path to the customized DC ISO. Defaults to $Env:UserProfile\Downloads\AD-Lab-DC.iso.
     .PARAMETER RouterISO
-    The path to the customized Router ISO. Defaults to C:\ozo-ad-lab\ISO\AD-Lab-Router.iso.
+    The path to the customized Router ISO. Defaults to $Env:UserProfile\Downloads\AD-Lab-Router.iso.
     .PARAMETER ServerISO
+    The path to the customized Server ISO. Defaults to $Env:UserProfile\Downloads\AD-Lab-Server.iso.
+    .PARAMETER VHDXPath
     The path for the VHDX files. Defaults to $Env:ProgramData\Microsoft\Windows\Virtual Hard Disks.
     .EXAMPLE
     ozo-ad-lab-create-vms
     .EXAMPLE
-    $isoPath = (Join-Path -Path $Env:USERPROFILE -ChildPath "Downloads")
+    $isoPath = (Join-Path -Path $Env:SystemDrive -ChildPath "Temp")
     ozo-ad-lab-create-vms -ClientISO "$isoPath\AD-Lab-Client.iso" -DCISO "$isoPath\AD-Lab-DC.iso"
     .LINK
     https://github.com/onezeroone-dev/OZO-AD-Lab-Create-VMs/blob/main/README.md
@@ -41,12 +41,11 @@
     Run this script in an Administrator PowerShell.
 #> 
 Param(
-    [Parameter(Mandatory=$false,HelpMessage="The path to the Client ISO")][String]$ClientISO = "C:\ozo-ad-lab\ISO\AD-Lab-Client.iso",
-    [Parameter(Mandatory=$false,HelpMessage="The path to the DC ISO")][String]$DCISO = "C:\ozo-ad-lab\ISO\AD-Lab-DC.iso",
-    [Parameter(Mandatory=$false,HelpMessage="The path to the Lanugages & Optional Features ISO")][String]$LaofISO = "C:\ozo-ad-lab\ISO\Windows-11-Lanuages-and-Optional-Features.iso",
-    [Parameter(Mandatory=$false,HelpMessage="The path to the Router ISO")][String]$RouterISO = "C:\ozo-ad-lab\ISO\AD-Lab-Router.iso",
-    [Parameter(Mandatory=$false,HelpMessage="The path to the Server ISO")][String]$ServerISO = "C:\ozo-ad-lab\ISO\AD-Lab-Server.iso",
-    [Parameter(Mandatory=$false,HelpMessage="The path for VHDX files")][String]$VHDXPath = (Join-Path -Path $Env:ProgramData -ChildPath "Microsoft\Windows\Virtual Hard Disks")
+    [Parameter(Mandatory=$false,HelpMessage="The path to the Client ISO")] [String]$ClientISO = (Join-Path -Path $Env:UserProfile -ChildPath "Downloads\OZO-AD-Lab-Client.iso"),
+    [Parameter(Mandatory=$false,HelpMessage="The path to the DC ISO")]     [String]$DCISO     = (Join-Path -Path $Env:UserProfile -ChildPath "Downloads\OZO-AD-Lab-DC.iso"),
+    [Parameter(Mandatory=$false,HelpMessage="The path to the Router ISO")] [String]$RouterISO = (Join-Path -Path $Env:UserProfile -ChildPath "Downloads\OZO-AD-Lab-Router.iso"),
+    [Parameter(Mandatory=$false,HelpMessage="The path to the Server ISO")] [String]$ServerISO = (Join-Path -Path $Env:UserProfile -ChildPath "Downloads\OZO-AD-Lab-Server.iso"),
+    [Parameter(Mandatory=$false,HelpMessage="The path for VHDX files")]    [String]$VHDXPath  = (Join-Path -Path $Env:ProgramData -ChildPath "Microsoft\Windows\Virtual Hard Disks")
 )
 
 # CLASSES
@@ -55,7 +54,6 @@ Class ADLCVM {
     [Array]  $hyperVSwitches = @("AD Lab External","AD Lab Private")
     [String] $clientISO      = $null
     [String] $dcISO          = $null
-    [String] $laofISO        = $null
     [String] $routerISO      = $null
     [String] $serverISO      = $null
     [String] $vhdxPath       = $null
@@ -65,11 +63,10 @@ Class ADLCVM {
     [System.Collections.Generic.List[PSCustomObject]] $ozoVMs = @()
     # METHODS
     # Constructor method
-    ADLCVM($ClientISO,$DCISO,$LaofISO,$RouterISO,$ServerISO,$VHDXPath) {
+    ADLCVM($ClientISO,$DCISO,$RouterISO,$ServerISO,$VHDXPath) {
         # Set properties
         $this.clientISO = $clientISO
         $this.dcISO     = $DCISO
-        $this.laofISO   = $LaofISO
         $this.routerISO = $RouterISO
         $this.serverISO = $ServerISO
         $this.vhdxPath  = $VHDXPath
@@ -116,7 +113,7 @@ Class ADLCVM {
     Hidden [Boolean] ValidateConfiguration() {
         # Control variable
         [Boolean] $Return = $true
-        ForEach ($Path in $this.clientISO,$this.dcISO,$this.laofISO,$this.serverISO) {
+        ForEach ($Path in $this.clientISO,$this.dcISO,$this.serverISO) {
             # Determine if the path is invalid
             If ((Test-Path -Path $Path) -eq $false) {
                 # Path is invalid
@@ -280,7 +277,6 @@ Class ADLCVMVirtualMachine {
                 }
             }
         }
-
         # Return
         return $Return
     }
@@ -299,4 +295,4 @@ Function Test-OZOHyperVAdministrator {
 }
 
 # MAIN
-[ADLCVM]::new($ClientISO,$DCISO,$LaofISO,$RouterISO,$ServerISO,$VHDXPath) | Out-Null
+[ADLCVM]::new($ClientISO,$DCISO,$RouterISO,$ServerISO,$VHDXPath) | Out-Null
