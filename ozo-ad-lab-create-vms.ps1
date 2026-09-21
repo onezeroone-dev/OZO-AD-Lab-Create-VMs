@@ -64,7 +64,7 @@ Class Main {
             # Iterate over the VMs
             ForEach ($ozoVM in $this.ozoVMs) {
                 # Log the creation of each VM and messages
-                $this.ozoLogger.Write(("Created VM " + $ozoVM.Name + " with the following messages: " + ($ozoVM.Messages -join ";")),"Information")
+                $this.ozoLogger.Write(($ozoVM.VMName + " process ended with the following messages: " + ($ozoVM.Messages -join ";")),"Information")
             }
         } Else {
             # Environment did not validate
@@ -114,31 +114,35 @@ Class Main {
 
 Class OzoVM {
     # PROPERTIES: Arrays, Booleans, Ints, Strings
-    [Array] $osList = @("Windows")   
+    [Array] $osList = @("Windows")
+    # PROPERTIES: Strings
+    [String] $VMName = $null
     # PROPERTIES: String Lists
     [System.Collections.Generic.List[String]] $Messages = @()
     # METHODS: Constructor method
     OzoVM($VMName,$OS,$vCPUs,$Memory,$Disk,$VHDXDir,$ISOPath,$Network) {
+        # Set properties
+        $this.VMName = $VMName
         # Determine if the VM validates
-        If ($this.ValidateVM($VMName,$OS,$ISOPath) -eq $true) {
+        If ($this.ValidateVM($OS,$ISOPath) -eq $true) {
             # VM validates; create the VM
-            $this.CreateVM($VMName,$OS,$vCPUs,$Memory,$Disk,$VHDXDir,$ISOPath,$Network)
+            $this.CreateVM($OS,$vCPUs,$Memory,$Disk,$VHDXDir,$ISOPath,$Network)
         }
     }
     # Validate VM method
-    Hidden [Boolean] ValidateVM($VMName,$OS,$ISOPath) {
+    Hidden [Boolean] ValidateVM($OS,$ISOPath) {
         # Control variable
         [Boolean] $Return = $true
         # Determine if the VM already exists
-        If ((Get-VM).Name -Contains $VMName) {
+        If ((Get-VM).Name -Contains $this.VMName) {
             # VM exists; skipping
             $this.Messages.Add("VM already exists")
             $Return = $false
         }
         # Determine if the ISO does not exist
         If ([Boolean](Test-Path -Path $ISOPath -ErrorAction SilentlyContinue) -eq $false) {
-            # isoPath is not valid
-            $this.ozoLogger.Write(("Cannot find " + $ISOPath),"Error")
+            # ISOPath is not valid
+            $this.Messages.Add(("Cannot find " + $ISOPath))
             $Return = $false
         }
         # Determine if OS is valid
@@ -151,9 +155,9 @@ Class OzoVM {
         return $Return
     }
     # Create VM method
-    Hidden [Void] CreateVM($VMName,$OS,$vCPUs,$Memory,$Disk,$VHDXDir,$ISOPath,$Network) {
+    Hidden [Void] CreateVM($OS,$vCPUs,$Memory,$Disk,$VHDXDir,$ISOPath,$Network) {
         # Local variables
-        [String] $VHDXPath = (Join-Path -Path $VHDXDir -ChildPath ($VMName + ".vhdx"))
+        [String] $VHDXPath = (Join-Path -Path $VHDXDir -ChildPath ($this.VMName + ".vhdx"))
         [String] $VMSBT = $null
         # Switch on OS to set VMSBT
         Switch($OS) {
@@ -166,33 +170,33 @@ Class OzoVM {
         }
         # Try to create the VM
         Try {
-            New-VM -Name $VMName -Generation 2 -MemoryStartupBytes $Memory -SwitchName $Network -NewVHDPath $VHDXPath -NewVHDSizeBytes $Disk -ErrorAction Stop
+            New-VM -Name $this.VMName -Generation 2 -MemoryStartupBytes $Memory -SwitchName $Network -NewVHDPath $VHDXPath -NewVHDSizeBytes $Disk -ErrorAction Stop
             # Configure processor count, automagic start action, and automagic stop action; and disable checkpoints
-            Set-VM -Name $VMName -ProcessorCount $vCPUs -AutomaticStartAction "Nothing" -AutomaticStopAction "Shutdown" -CheckpointType "Disabled" -ErrorAction Stop
+            Set-VM -Name $this.VMName -ProcessorCount $vCPUs -AutomaticStartAction "Nothing" -AutomaticStopAction "Shutdown" -CheckpointType "Disabled" -ErrorAction Stop
             # Configure Memory and Memory Buffer
-            Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $true -MinimumBytes 536870912 -MaximumBytes $Memory -Buffer 5 -ErrorAction Stop
+            Set-VMMemory -VMName $this.VMName -DynamicMemoryEnabled $true -MinimumBytes 536870912 -MaximumBytes $Memory -Buffer 5 -ErrorAction Stop
             # Configure firmware
-            Set-VMFirmware -VMName $VMName -EnableSecureBoot "On" -SecureBootTemplate $VMSBT -ErrorAction Stop
+            Set-VMFirmware -VMName $this.VMName -EnableSecureBoot "On" -SecureBootTemplate $VMSBT -ErrorAction Stop
             # Enable Key Protector
-            Set-VMKeyProtector -VMName $VMName -NewLocalKeyProtector -ErrorAction Stop
+            Set-VMKeyProtector -VMName $this.VMName -NewLocalKeyProtector -ErrorAction Stop
             # Enable TPM
-            Enable-VMTPM -VMName $VMName -ErrorAction Stop
+            Enable-VMTPM -VMName $this.VMName -ErrorAction Stop
             # Configure the DVD drive
-            Add-VMDvdDrive -VMName $VMName -Path $ISOPath -ErrorAction Stop
+            Add-VMDvdDrive -VMName $this.VMName -Path $ISOPath -ErrorAction Stop
             # Set DVD drive as first boot option
-            Set-VMFirmware -VMName $VMName -FirstBootDevice (Get-VMDvdDrive -VMName $VMName) -ErrorAction Stop
+            Set-VMFirmware -VMName $this.VMName -FirstBootDevice (Get-VMDvdDrive -VMName $this.VMName) -ErrorAction Stop
             # Configure integrations
-            Enable-VMIntegrationService -VMName $VMName -Name "Guest Service Interface","Heartbeat","Key-Value Pair Exchange","Shutdown","Time Synchronization","VSS" -ErrorAction Stop
+            Enable-VMIntegrationService -VMName $this.VMName -Name "Guest Service Interface","Heartbeat","Key-Value Pair Exchange","Shutdown","Time Synchronization","VSS" -ErrorAction Stop
             # Success
             $this.Messages.Add(("Success"))
         } Catch {
             # Failure
-            $this.Messages.Add(("Failed to create or configure " + $VMName + " VM with error " + $_ + "; Deleting"))
+            $this.Messages.Add(("Failed to create or configure " + $this.VMName + " VM with error " + $_ + "; Deleting"))
             # Determine if the VM was created in any capacity or configuration
-            If ([Boolean](Get-VM -VMName $VMName) -eq $true) {
+            If ([Boolean](Get-VM -VMName $this.VMName) -eq $true) {
                 # VM was created; try to remove it
                 Try {
-                    Remove-VM -VMName $VMName -Force -ErrorAction Stop
+                    Remove-VM -VMName $this.VMName -Force -ErrorAction Stop
                     # Success; determine if a VHDX was created
                     If ([Boolean](Test-Path -Path $VHDXPath -ErrorAction SilentlyContinue) -eq $true) {
                         # VHDX was created; remove it
@@ -200,7 +204,7 @@ Class OzoVM {
                     }
                 } Catch {
                     # Failure
-                    $this.Messages.Add(("Unable to delete the " + $VMName + " VM; Lab VM deployment may be in an inconsistent state."))
+                    $this.Messages.Add(("Unable to delete the " + $this.VMName + " VM; Lab VM deployment may be in an inconsistent state."))
                 }
             }
         }
