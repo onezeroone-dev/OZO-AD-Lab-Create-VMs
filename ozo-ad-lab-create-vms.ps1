@@ -1,7 +1,7 @@
-#Requires -Modules @{ModuleName="OZO";ModuleVersion="1.5.0"},@{ModuleName="OZOLogger";ModuleVersion="1.1.0"} -RunAsAdministrator
+#Requires -Modules @{ModuleName="OZO";ModuleVersion="1.7.0"},OZOLogger -RunAsAdministrator
 
 <#PSScriptInfo
-    .VERSION 1.0.1
+    .VERSION 1.1.0
     .GUID e2071482-27a4-415c-b3db-43d5351d24bb
     .AUTHOR Andy Lievertz <alievertz@onezeroone.dev>
     .COMPANYNAME One Zero One
@@ -19,116 +19,65 @@
 
 <# 
     .DESCRIPTION 
-    An interactive script that creates a the Hyper-V virtual machines required for the One Zero One AD Lab.
-    .PARAMETER ClientISO
+    Creates a the Hyper-V virtual machines required for the One Zero One AD Lab.
+    .PARAMETER ClientISOPath
     The path to the customized Client ISO. Defaults to $Env:UserProfile\Downloads\AD-Lab-Client.iso.
-    .PARAMETER DCISO
-    The path to the customized DC ISO. Defaults to $Env:UserProfile\Downloads\AD-Lab-DC.iso.
-    .PARAMETER RouterISO
-    The path to the customized Router ISO. Defaults to $Env:UserProfile\Downloads\AD-Lab-Router.iso.
-    .PARAMETER ServerISO
+    .PARAMETER HyperVSwitch
+    The Hyper-V switch to use. Defaults to "OZO AD Lab NAT".
+    .PARAMETER ServerISOPath
     The path to the customized Server ISO. Defaults to $Env:UserProfile\Downloads\AD-Lab-Server.iso.
-    .PARAMETER VHDXPath
-    The path for the VHDX files. Defaults to $Env:ProgramData\Microsoft\Windows\Virtual Hard Disks.
+    .PARAMETER VHDXDir
+    The directory for the VHDX files. Defaults to $Env:ProgramData\Microsoft\Windows\Virtual Hard Disks.
     .EXAMPLE
     ozo-ad-lab-create-vms
     .EXAMPLE
-    $isoPath = (Join-Path -Path $Env:SystemDrive -ChildPath "Temp")
-    ozo-ad-lab-create-vms -ClientISO "$isoPath\AD-Lab-Client.iso" -DCISO "$isoPath\AD-Lab-DC.iso"
+    ozo-ad-lab-create-vms -ClientISOPath "C:\Temp\AD-Lab-Client.iso" -ServerISOPath "C:\Temp\AD-Lab-DC.iso"
     .LINK
     https://github.com/onezeroone-dev/OZO-AD-Lab-Create-VMs/blob/main/README.md
     .NOTES
     Run this script in an Administrator PowerShell.
 #> 
 Param(
-    [Parameter(Mandatory=$false,HelpMessage="The path to the Client ISO")] [String]$ClientISO = (Join-Path -Path $Env:UserProfile -ChildPath "Downloads\OZO-AD-Lab-Client.iso"),
-    [Parameter(Mandatory=$false,HelpMessage="The path to the DC ISO")]     [String]$DCISO     = (Join-Path -Path $Env:UserProfile -ChildPath "Downloads\OZO-AD-Lab-DC.iso"),
-    [Parameter(Mandatory=$false,HelpMessage="The path to the Router ISO")] [String]$RouterISO = (Join-Path -Path $Env:UserProfile -ChildPath "Downloads\OZO-AD-Lab-Router.iso"),
-    [Parameter(Mandatory=$false,HelpMessage="The path to the Server ISO")] [String]$ServerISO = (Join-Path -Path $Env:UserProfile -ChildPath "Downloads\OZO-AD-Lab-Server.iso"),
-    [Parameter(Mandatory=$false,HelpMessage="The path for VHDX files")]    [String]$VHDXPath  = (Join-Path -Path $Env:ProgramData -ChildPath "Microsoft\Windows\Virtual Hard Disks")
+    [Parameter(Mandatory=$false,HelpMessage="Path to the Client ISO")][String] $ClientISOPath = (Join-Path -Path $Env:UserProfile -ChildPath "Downloads\OZO-AD-Lab-Client.iso"),
+    [Parameter(Mandatory=$false,HelpMessage="Hyper-V switch to use")][String] $HyperVSwitch = "OZO AD Lab NAT",
+    [Parameter(Mandatory=$false,HelpMessage="Path to the Server ISO")][String] $ServerISOPath = (Join-Path -Path $Env:UserProfile -ChildPath "Downloads\OZO-AD-Lab-Server.iso"),
+    [Parameter(Mandatory=$false,HelpMessage="Directory for VHDX files")][String] $VHDXDir = (Join-Path -Path $Env:ProgramData -ChildPath "Microsoft\Windows\Virtual Hard Disks")
 )
 
 # CLASSES
-Class ADLCVM {
-    # PROPERTIES: Arrays, Strings
-    [Array]  $hyperVSwitches = @("AD Lab External","AD Lab Private")
-    [String] $clientISO      = $null
-    [String] $dcISO          = $null
-    [String] $routerISO      = $null
-    [String] $serverISO      = $null
-    [String] $vhdxPath       = $null
+Class Main {
     # PROPERTIES: PSCustomObjects
     [PSCustomObject] $ozoLogger = @{}
-    # PROPERTIES: Lists
+    # PROPERTIES: PSCustomObject Lists
     [System.Collections.Generic.List[PSCustomObject]] $ozoVMs = @()
-    # METHODS
-    # Constructor method
-    ADLCVM($ClientISO,$DCISO,$RouterISO,$ServerISO,$VHDXPath) {
-        # Set properties
-        $this.clientISO = $clientISO
-        $this.dcISO     = $DCISO
-        $this.routerISO = $RouterISO
-        $this.serverISO = $ServerISO
-        $this.vhdxPath  = $VHDXPath
+    # METHODS: Constructor method
+    Main($ClientISOPath,$HyperVSwitch,$ServerISOPath,$VHDXDir) {
+        # Create a logger object
         $this.ozoLogger = (New-OZOLogger)
-        # Announce ourselves to the world.
+        # Log a process start message
         $this.ozoLogger.Write("Process starting.","Information")
-        $this.ozoLogger
-        # Call validate configuration and validate environment to determine if we can proceed
-        If (($this.ValidateConfiguration() -And $this.ValidateEnvironment()) -eq $true) {
-            # Report
-            $this.ozoLogger.Write("Configuration and environment validated; evaluating VMs.","Information")
-            # Create the virtual machine objects
-            $this.ozoVMs.Add(([ADLCVMVirtualMachine]::new("AD Lab 01 router.contoso.com","Linux",1,1073741824,68719476736,$this.vhdxPath,$this.routerISO,"AD Lab External","AD Lab Private")))
-            # Creat an ADLCVMVirtualMachine object for the DC
-            $this.ozoVMs.Add(([ADLCVMVirtualMachine]::new("AD Lab 02 dc.contoso.com","Windows",1,2147483648,137438953472,$this.vhdxPath,$this.dcISO,"AD Lab Private",$null)))
-            # Creat an ADLCVMVirtualMachine object for the Server
-            $this.ozoVMs.Add(([ADLCVMVirtualMachine]::new("AD Lab 03 server.contoso.com","Windows",1,2147483648,137438953472,$this.vhdxPath,$this.serverISO,"AD Lab Private",$null)))
-            # Creat an ADLCVMVirtualMachine object for the Client
-            $this.ozoVMs.Add(([ADLCVMVirtualMachine]::new("AD Lab 04 client.contoso.com","Windows",2,4294967296,137438953472,$this.vhdxPath,$this.clientISO,"AD Lab Private",$null)))
-            # Configuration and environment validate; iterate through the VM objects
-            ForEach ($VM in $this.ozoVMs) {
-                If ($VM.Create -eq $true) {
-                    # VM validated; call the CreateVM method to create the VM and set Created on the VM object
-                    If ($VM.CreateVM() -eq $true) {
-                        # VM was created
-                        $this.ozoLogger.Write(("Creating the " + $VM.vmName + " VM."),"Information")
-                    } Else {
-                        # VM was not created
-                        $this.ozoLogger.Write(("Error creating the " + $VM.vmName + " virtual machine for the following reasons:`r`n" + ($VM.Messages -Join("`r`n"))),"Warning")
-                    }
-                } Else {
-                    # VM did not validate; report
-                    $this.ozoLogger.Write(("Skipping the " + $VM.vmName + " virtual machine for the following reasons:`r`n" + ($VM.Messages -Join("`r`n"))),"Warning")
-                }
-                
+        # Determine if environment validate
+        If ($this.ValidateEnvironment($HyperVSwitch,$VHDXDir) -eq $true) {
+            # Environment validated; create the virtual machine objects
+            $this.ozoVMs.Add(([OzoVM]::new("OZO AD Lab Windows AD Domain Controller","Windows",1,2147483648,137438953472,$VHDXDir,$ServerISOPath,$HyperVSwitch)))
+            $this.ozoVMs.Add(([OzoVM]::new("OZO AD Lab Windows Client","Windows",2,4294967296,137438953472,$VHDXDir,$ClientISOPath,$HyperVSwitch)))
+            # Iterate over the VMs
+            ForEach ($ozoVM in $this.ozoVMs) {
+                # Log the creation of each VM and messages
+                $this.ozoLogger.Write(("Created VM " + $ozoVM.Name + " with the following messages: " + ($ozoVM.Messages -join ";")),"Information")
             }
         } Else {
-            $this.ozoLogger.Write("Configuration and/or environment did not validate.","Error")
+            # Environment did not validate
+            $this.ozoLogger.Write("Environment did not validate.","Error")
         }
-        # Bid the world adieu.
+        # Log a process complete message
         $this.ozoLogger.Write("Process complete.","Information")
     }
-    # Validate configuration method
-    Hidden [Boolean] ValidateConfiguration() {
+    # METHODS: Validate environment method
+    Hidden [Boolean] ValidateEnvironment($HyperVSwitch,$VHDXDir) {
         # Control variable
         [Boolean] $Return = $true
-        ForEach ($Path in $this.clientISO,$this.dcISO,$this.serverISO) {
-            # Determine if the path is invalid
-            If ((Test-Path -Path $Path) -eq $false) {
-                # Path is invalid
-                $this.ozoLogger.Write(("Cannot find " + $Path),"Error")
-                $Return = $false
-            }
-        }
-        # Return
-        return $Return
-    }
-    # Validate environment methods
-    Hidden [Boolean] ValidateEnvironment() {
-        # Control variable
-        [Boolean] $Return = $true
-        # Test if session is user-interactive
+        # Determine if the session is user-interactive
         If ((Get-OZOUserInteractive) -eq $false) {
             # Session is not user-interactive
             $this.ozoLogger.Write("Please run this script in a user-interactive session.","Error")
@@ -140,23 +89,20 @@ Class ADLCVM {
             $this.ozoLogger.Write("User is not an Administrator or a member of Hyper-V Administrators. Run this script in an Administrator PowerShell session or add your user to the local Hyper-V Administrators group.")
             $Return = $false
         }
-        # Iterate through the Hyper-V virtual switches
-        ForEach ($virtualSwitch in $this.hyperVSwitches) {
-            # Determine if the switch is not present
-            If ((Get-VMSwitch).Name -NotContains $virtualSwitch) {
-                # Switch is not present
-                $this.ozoLogger.Write(("Hyper-V virtual switch " + $virtualSwitch + " not found."),"Error")
-                $Return = $false
-            }
+        # Determine if the Hyper-V switch is not present
+        If ((Get-VMSwitch).Name -NotContains $HyperVSwitch) {
+            # Switch is not present
+            $this.ozoLogger.Write(("HyperVSwitch not found."),"Error")
+            $Return = $false
         }
         # Determine if the VHDXPath is not writable
-        If ((Test-OZOPath -Writable -Path $this.vhdxPath) -eq $false) {
+        If ((Test-OZOPath -Writable -Path $VHDXDir) -eq $false) {
             # Path is not writable
-            $this.ozoLogger.Write(("The VHDX path is not writable."),"Error")
+            $this.ozoLogger.Write(("VHDXDir is not writable."),"Error")
             $Return = $false
         }
         # Determine if the Hyper-V Feature is not installed
-        If ([Boolean](Get-WindowsOptionalFeature -Online -FeatureName "Microsoft-Hyper-V") -eq $false) {
+        If ([Boolean](Get-WindowsOptionalFeature -Online -FeatureName "Microsoft-Hyper-V" -ErrorAction SilentlyContinue) -eq $false) {
             # Feature is not present
             $this.ozoLogger.Write(("The Hyper-V Feature is not installed. Please see https://onezeroone.dev/active-directory-lab-prerequisites."),"Error")
             $Return = $false
@@ -166,119 +112,98 @@ Class ADLCVM {
     }
 }
 
-Class ADLCVMVirtualMachine {
+Class OzoVM {
     # PROPERTIES: Arrays, Booleans, Ints, Strings
-    [Array]   $osList   = @("Linux","Windows")
-    [Boolean] $Create   = $true
-    [Int16]   $vmVCPUs  = $null
-    [Int64]   $vmDisk   = $null
-    [Int64]   $vmMemory = $null
-    [String]  $vhdxPath = $null
-    [String]  $vmISO    = $null
-    [String]  $vmName   = $null
-    [String]  $vmOS     = $null
-    [String]  $vmSBT    = $null
-    [String]  $vmSwitch = $null
-    [String]  $vmSwit2h = $null    
-    # Properties: Lists
+    [Array] $osList = @("Windows")   
+    # PROPERTIES: String Lists
     [System.Collections.Generic.List[String]] $Messages = @()
-    # METHODS
-    # Constructor method
-    ADLCVMVirtualMachine($Name,$OS,$vCPUs,$Memory,$Disk,$VHDXPath,$ISO,$Network,$Netwo2k) {
-        # Set properties
-        $this.vmName   = $Name
-        $this.vmOS     = $OS
-        $this.vmVCPUs  = $vCPUs
-        $this.vmMemory = $Memory
-        $this.vmDisk   = $Disk
-        $this.vhdxPath = (Join-Path -Path $VHDXPath -ChildPath ($this.vmName + ".vhdx"))
-        $this.vmISO    = $ISO
-        $this.vmSwitch = $Network
-        $this.vmSwit2h = $Netwo2k
-        # Switch on OS to set vmSBT
-        Switch($this.vmOS) {
-            "Linux" {
-                $this.vmSBT = "MicrosoftUEFICertificateAuthority"
-            }
-            default {
-                $this.vmSBT = "MicrosoftWindows"
-            }
+    # METHODS: Constructor method
+    OzoVM($VMName,$OS,$vCPUs,$Memory,$Disk,$VHDXDir,$ISOPath,$Network) {
+        # Determine if the VM validates
+        If ($this.ValidateVM($VMName,$OS,$ISOPath) -eq $true) {
+            # VM validates; create the VM
+            $this.CreateVM($VMName,$OS,$vCPUs,$Memory,$Disk,$VHDXDir,$ISOPath,$Network)
         }
-        # Call ValidateVM to set Create
-        $this.Create = $this.ValidateVM()
     }
     # Validate VM method
-    Hidden [Boolean] ValidateVM() {
+    Hidden [Boolean] ValidateVM($VMName,$OS,$ISOPath) {
         # Control variable
         [Boolean] $Return = $true
         # Determine if the VM already exists
-        If ((Get-VM).Name -Contains $this.vmName) {
+        If ((Get-VM).Name -Contains $VMName) {
             # VM exists; skipping
-            $this.Messages.Add("VM already exists.")
+            $this.Messages.Add("VM already exists")
             $Return = $false
         }
-        If ((Test-Path -Path $this.vhdxPath) -eq $true) {
-            # VM disk exists; skipping
-            $this.Messages.Add("VM disk already exists.")
+        # Determine if the ISO does not exist
+        If ([Boolean](Test-Path -Path $ISOPath -ErrorAction SilentlyContinue) -eq $false) {
+            # isoPath is not valid
+            $this.ozoLogger.Write(("Cannot find " + $ISOPath),"Error")
             $Return = $false
         }
         # Determine if OS is valid
-        If ($this.osList -NotContains $this.vmOS) {
+        If ($this.osList -NotContains $OS) {
             # OS is not handled
-            $this.Messages.Add(("Operating system " + $this.vmOS + " is invalid."))
+            $this.Messages.Add("OS is not a supported")
+            $Return = $false
         }
         # Return
         return $Return
     }
     # Create VM method
-    [Boolean] CreateVM() {
-        # Control variables
-        [Boolean] $Return = $true
-        # Create the VM
-        Try {
-            New-VM -Name $this.vmName -Generation 2 -MemoryStartupBytes $this.vmMemory -SwitchName $this.vmSwitch -NewVHDPath $this.vhdxPath -NewVHDSizeBytes $this.vmDisk -ErrorAction Stop
-            # Success; configure processor count, automagic start action, and automagic stop action; and disable checkpoints
-            Set-VM -Name $this.vmName -ProcessorCount $this.vmVCPUs -AutomaticStartAction "Nothing" -AutomaticStopAction "Shutdown" -CheckpointType "Disabled"
-            # Configure Memory and Memory Buffer
-            Set-VMMemory -VMName $this.vmName -DynamicMemoryEnabled $true -MinimumBytes 536870912 -MaximumBytes $this.vmMemory -Buffer 5 -ErrorAction Stop
-            # Configure firmware
-            Set-VMFirmware -VMName $this.vmName -EnableSecureBoot "On" -SecureBootTemplate $this.vmSBT -ErrorAction Stop
-            # Enable TPM and Key Protector
-            Set-VMKeyProtector -VMName $this.vmName -NewLocalKeyProtector
-            Enable-VMTPM -VMName $this.vmName -ErrorAction Stop
-            # Configure the DVD drive
-            Add-VMDvdDrive -VMName $this.vmName -Path $this.vmISO
-            # Set DVD drive as first boot option
-            Set-VMFirmware -VMName $this.vmName -FirstBootDevice (Get-VMDvdDrive -VMName $this.vmName)
-            # Configure integrations
-            Enable-VMIntegrationService -VMName $this.vmName -Name "Guest Service Interface","Heartbeat","Key-Value Pair Exchange","Shutdown","Time Synchronization","VSS" -ErrorAction Stop
-            # Determine if this VM should ahve a second vSwitch
-            If ([String]::IsNullOrEmpty($this.vmSwit2h) -eq $false) {
-                # Add second vSwitch
-                Add-VMNetworkAdapter -VMName $this.vmName -SwitchName $this.vmSwit2h -ErrorAction Stop
+    Hidden [Void] CreateVM($VMName,$OS,$vCPUs,$Memory,$Disk,$VHDXDir,$ISOPath,$Network) {
+        # Local variables
+        [String] $VHDXPath = (Join-Path -Path $VHDXDir -ChildPath ($VMName + ".vhdx"))
+        [String] $VMSBT = $null
+        # Switch on OS to set VMSBT
+        Switch($OS) {
+            "Linux" {
+                $VMSBT = "MicrosoftUEFICertificateAuthority"
             }
+            default {
+                $VMSBT = "MicrosoftWindows"
+            }
+        }
+        # Try to create the VM
+        Try {
+            New-VM -Name $VMName -Generation 2 -MemoryStartupBytes $Memory -SwitchName $Network -NewVHDPath $VHDXPath -NewVHDSizeBytes $Disk -ErrorAction Stop
+            # Configure processor count, automagic start action, and automagic stop action; and disable checkpoints
+            Set-VM -Name $VMName -ProcessorCount $vCPUs -AutomaticStartAction "Nothing" -AutomaticStopAction "Shutdown" -CheckpointType "Disabled" -ErrorAction Stop
+            # Configure Memory and Memory Buffer
+            Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $true -MinimumBytes 536870912 -MaximumBytes $Memory -Buffer 5 -ErrorAction Stop
+            # Configure firmware
+            Set-VMFirmware -VMName $VMName -EnableSecureBoot "On" -SecureBootTemplate $VMSBT -ErrorAction Stop
+            # Enable Key Protector
+            Set-VMKeyProtector -VMName $VMName -NewLocalKeyProtector -ErrorAction Stop
+            # Enable TPM
+            Enable-VMTPM -VMName $VMName -ErrorAction Stop
+            # Configure the DVD drive
+            Add-VMDvdDrive -VMName $VMName -Path $ISOPath -ErrorAction Stop
+            # Set DVD drive as first boot option
+            Set-VMFirmware -VMName $VMName -FirstBootDevice (Get-VMDvdDrive -VMName $VMName) -ErrorAction Stop
+            # Configure integrations
+            Enable-VMIntegrationService -VMName $VMName -Name "Guest Service Interface","Heartbeat","Key-Value Pair Exchange","Shutdown","Time Synchronization","VSS" -ErrorAction Stop
+            # Success
+            $this.Messages.Add(("Success"))
         } Catch {
             # Failure
-            $this.Messages.Add(("Error creating or configuring " + $this.vmName + " VM. Error message is " + $_ + "`r`nDeleting."))
-            $Return = $false
+            $this.Messages.Add(("Failed to create or configure " + $VMName + " VM with error " + $_ + "; Deleting"))
             # Determine if the VM was created in any capacity or configuration
-            If ([Boolean](Get-VM -VMName $this.vmName) -eq $true) {
+            If ([Boolean](Get-VM -VMName $VMName) -eq $true) {
                 # VM was created; try to remove it
                 Try {
-                    Remove-VM -VMName $this.vmName -Force -ErrorAction Stop
+                    Remove-VM -VMName $VMName -Force -ErrorAction Stop
                     # Success; determine if a VHDX was created
-                    If ((Test-Path -Path $this.vhdxPath) -eq $true) {
+                    If ([Boolean](Test-Path -Path $VHDXPath -ErrorAction SilentlyContinue) -eq $true) {
                         # VHDX was created; remove it
-                        Remove-Item -Path $this.vhdxPath -Force -ErrorAction Stop
+                        Remove-Item -Path $VHDXPath -Force -ErrorAction Stop
                     }
                 } Catch {
                     # Failure
-                    $this.Messages.Add(("Unable to delete the " + $this.vmName + " VM. AD Lab configuration may be in an inconsistent state."))
+                    $this.Messages.Add(("Unable to delete the " + $VMName + " VM; Lab VM deployment may be in an inconsistent state."))
                 }
             }
         }
-        # Return
-        return $Return
     }
 }
 
@@ -295,4 +220,4 @@ Function Test-OZOHyperVAdministrator {
 }
 
 # MAIN
-[ADLCVM]::new($ClientISO,$DCISO,$RouterISO,$ServerISO,$VHDXPath) | Out-Null
+[Main]::new($ClientISOPath,$HyperVSwitch,$ServerISOPath,$VHDXDir) | Out-Null

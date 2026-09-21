@@ -1,9 +1,7 @@
 # OZO AD Lab Create VMs
 
 ## Description
-This script automates [part](https://onezeroone.dev/active-directory-lab-part-iii-create-the-virtual-machines/) of a One Zero One [series](https://onezeroone.dev/active-directory-lab-part-i-introduction/) that illustrates how to automate the process of deploying an AD Lab.
-
-It is an interactive script that creates the required Hyper-V virtual machines. If a virtual machine already exists, it is skipped. This is useful if e.g., you would like to keep the Linux router VM but delete and replace all the Windows VMs.
+This interactive script automates [part](https://onezeroone.dev/active-directory-lab-part-iii-create-the-virtual-machines/) of a One Zero One [series](https://onezeroone.dev/active-directory-lab-part-i-introduction/) that illustrates how to automate the process of deploying an AD Lab. It creates the required Hyper-V virtual machines. If a virtual machine already exists, it is skipped.
 
 ## Prerequisites
 To use this script you must first install Hyper-V and restart, and create two Hyper-V virtual switches. Please see [Active Directory Lab Part III: Installation Prerequisites](https://onezeroone.dev/active-directory-lab-part-iii-installation-prerequisites/).
@@ -18,33 +16,29 @@ Install-Script ozo-ad-lab-create-vms
 ## Usage
 ```powershell
 ozo-ad-lab-create-vms
-    -ClientISO <String>
-    -DCISO     <String>
-    -RouterISO <String>
-    -ServerISO <String>
-    -VHDXPath  <String>
+    [-ClientISOPath <String>]
+    [-HyperVSwitch <String>]
+    [-ServerISOPath <String>]
+    [-VHDXDir <String>]
 ```
 
 ## Parameters
 |Parameter|Description|
 |---------|-----------|
-|`ClientISO`|The path to the [customized\] Client ISO. Defaults to `$Env:UserProfile\Downloads\AD-Lab-Client.iso`.|
-|`DCISO`|The path to the [customized\] DC ISO. Defaults to `$Env:UserProfile\Downloads\AD-Lab-DC.iso`.|
-|`RouterISO`|The path to the [customized\] Router ISO. Defaults to `$Env:UserProfile\Downloads\AD-Lab-Router.iso`.|
-|`ServerISO`|The path to the [customized\] Server ISO. Defaults to `$Env:UserProfile\Downloads\AD-Lab-Server.iso`.|
-|`VHDXPath`|The path for the VHDX files. Defaults to `$Env:ProgramData\Microsoft\Windows\Virtual Hard Disks`.|
+|`ClientISOPath`|The path to the [customized\] Client ISO. Defaults to `$Env:UserProfile\Downloads\OZO-AD-Lab-Client.iso`.|
+|`HyperVSwitch`|The Hyper-V switch to use. Defaults to _OZO AD Lab NAT_.|
+|`ServerISOPath`|The path to the [customized\] Server ISO. Defaults to `$Env:UserProfile\Downloads\OZO-AD-Lab-Server.iso`.|
+|`VHDXDir`|The directory for the VHDX files. Defaults to `$Env:ProgramData\Microsoft\Windows\Virtual Hard Disks`.|
 
 ## Examples
 ### Example 1
-When all customized OZO-AD-Lab-* ISOs are in your _Downloads_ folder and named as described in [Active Directory Lab Part II: Customize the Installer ISOs](https://onezeroone.dev/active-directory-lab-part-ii-customize-the-installer-isos/), you can run this script with no parameters:
+When all customized installer ISOs are in your _Downloads_ folder and named as described in [Active Directory Lab Part II: Customize the Installer ISOs](https://onezeroone.dev/active-directory-lab-part-ii-customize-the-installer-isos/), you can run this script with no parameters:
 ```powershell
 ozo-ad-lab-create-vms
 ```
 ### Example 2
-If your customized installer ISOs are located elsewhere, you can specify their locations using the relevant parameters, e.g,. if the Client and DC ISOs are in `C:\Temp`:
 ```powershell
-$isoPath = (Join-Path -Path $Env:SystemDrive -ChildPath "Temp")
-ozo-ad-lab-create-vms -ClientISO "$isoPath\AD-Lab-Client.iso" -DCISO "$isoPath\AD-Lab-DC.iso"
+ozo-ad-lab-create-vms -ClientISOPath "C:\Temp\AD-Lab-Client.iso" -ServerISOPath "C:\Temp\AD-Lab-DC.iso"
 ```
 
 ## Notes
